@@ -98,9 +98,15 @@
 
   /* ══════════ Game frames ══════════ */
   .game-title {
-    text-align: center; padding: 14px 64px 4px; flex-shrink: 0;
+    text-align: center; padding: 14px 64px 0; flex-shrink: 0;
     color: #fff; font-size: 24px; font-weight: 800; letter-spacing: 1px;
     text-shadow: 2px 2px 0 var(--orange-d), -1px -1px 0 var(--orange-d);
+  }
+  .level-badge {
+    align-self: center; flex-shrink: 0; margin: 2px 0 0;
+    background: #fff; color: var(--orange-d);
+    font-size: 15px; font-weight: 800; padding: 3px 16px; border-radius: 50px;
+    box-shadow: 0 2px 0 rgba(0,0,0,0.15);
   }
 
   .row-wrap { flex: 1; display: flex; align-items: center; justify-content: center; padding: 6px 10px; }
@@ -264,6 +270,7 @@
   <button class="home-btn" data-go="menu">⌂</button>
   <button class="sound-btn snd">🔊</button>
   <div class="game-title">かたち あわせ</div>
+  <div class="level-badge" id="badge-shapes">レベル 1</div>
   <div class="row-wrap"><div class="panel" id="shapes-slots"></div></div>
   <div class="hint">↑ おなじ かたちに おこう</div>
   <div class="row-wrap"><div class="panel" id="shapes-pieces"></div></div>
@@ -274,6 +281,7 @@
   <button class="home-btn" data-go="menu">⌂</button>
   <button class="sound-btn snd">🔊</button>
   <div class="game-title">いろ あわせ</div>
+  <div class="level-badge" id="badge-colors">レベル 1</div>
   <div class="row-wrap"><div class="panel" id="colors-slots"></div></div>
   <div class="hint">↑ おなじ いろに おこう</div>
   <div class="row-wrap"><div class="panel" id="colors-pieces"></div></div>
@@ -284,6 +292,7 @@
   <button class="home-btn" data-go="menu">⌂</button>
   <button class="sound-btn snd">🔊</button>
   <div class="game-title">おなじは どれ？</div>
+  <div class="level-badge" id="badge-match">レベル 1</div>
   <div class="row-wrap"><div class="target-big" id="match-target"></div></div>
   <div class="hint">↓ おなじ こを えらんでね</div>
   <div class="row-wrap"><div class="panel" id="match-opts"></div></div>
@@ -294,6 +303,7 @@
   <button class="home-btn" data-go="menu">⌂</button>
   <button class="sound-btn snd">🔊</button>
   <div class="game-title">タッチ して あそぼう</div>
+  <div class="level-badge" id="badge-pop">レベル 1</div>
   <div id="pop-field"></div>
   <div id="pop-score">タッチ: 0</div>
 </section>
@@ -314,13 +324,49 @@
    ════════════════════════════════════════════════════════════════ */
 const App = { sound: true, current: 'menu' };
 
+// ── Levels: persisted per mode, increase difficulty as the child progresses ──
+const Levels = {
+  data: (() => { try { return JSON.parse(localStorage.getItem('anpanLevels')) || {}; } catch(e) { return {}; } })(),
+  get(mode) { return this.data[mode] || 1; },
+  set(mode, v) {
+    this.data[mode] = v;
+    try { localStorage.setItem('anpanLevels', JSON.stringify(this.data)); } catch(e) {}
+  },
+  next(mode) { this.set(mode, this.get(mode) + 1); },
+  // how many items this level should present (gentle ramp, capped)
+  count(mode, base, max) { return Math.min(base + Math.floor((this.get(mode) - 1) / 2), max); }
+};
+
+function showBadge(mode) {
+  const b = document.getElementById('badge-' + mode);
+  if (b) b.textContent = 'レベル ' + Levels.get(mode);
+}
+
 const SFX = {
   ctx: null,
-  ac() { if (!this.ctx) this.ctx = new (window.AudioContext || window.webkitAudioContext)(); return this.ctx; },
+  // Create the single shared AudioContext (lazily, inside a user gesture)
+  init() {
+    if (this.ctx) return this.ctx;
+    try { this.ctx = new (window.AudioContext || window.webkitAudioContext)(); } catch(e) {}
+    return this.ctx;
+  },
+  // iOS unlock: resume the context and play one silent buffer on a real touch
+  unlock() {
+    this.init();
+    if (!this.ctx) return;
+    if (this.ctx.state === 'suspended') this.ctx.resume();
+    try {
+      const b = this.ctx.createBuffer(1, 1, 22050);
+      const s = this.ctx.createBufferSource();
+      s.buffer = b; s.connect(this.ctx.destination); s.start(0);
+    } catch(e) {}
+  },
   tone(freqs, dur, vol, type='sine') {
     if (!App.sound) return;
+    const ctx = this.init();
+    if (!ctx) return;
+    if (ctx.state === 'suspended') ctx.resume();   // keep alive between rounds
     try {
-      const ctx = this.ac();
       freqs.forEach((f, i) => {
         const o = ctx.createOscillator(), g = ctx.createGain();
         o.type = type; o.connect(g); g.connect(ctx.destination);
@@ -337,6 +383,11 @@ const SFX = {
   wrong() { this.tone([210, 170], 0.22, 0.22, 'triangle'); },
   pop()   { this.tone([700, 1000], 0.16, 0.3, 'sine'); },
 };
+
+// Unlock audio on the very first user interaction (required by iOS Safari),
+// and keep resuming on later taps in case the OS suspends it.
+['touchstart','touchend','mousedown','pointerdown'].forEach(ev =>
+  document.addEventListener(ev, () => SFX.unlock(), { passive: true }));
 
 function updateSoundIcons() {
   document.querySelectorAll('.snd, #sound-menu').forEach(b => b.textContent = App.sound ? '🔊' : '🔈');
@@ -540,10 +591,12 @@ document.getElementById('cele-home').onclick = ()=>{
    MODE: Shapes
    ════════════════════════════════════════════════════════════════ */
 const ModeShapes = {
-  placed: new Set(),
+  placed: new Set(), need: 3,
   start(){
     this.placed = new Set();
-    const keys = shuffle(pickN(SHAPE_KEYS, 3));      // random 3 shapes, random order
+    showBadge('shapes');
+    this.need = Levels.count('shapes', 3, 5);        // 3 → 4 → 5 as levels rise
+    const keys = shuffle(pickN(SHAPE_KEYS, this.need));
     const slots = document.getElementById('shapes-slots');
     const pieces = document.getElementById('shapes-pieces');
     slots.innerHTML=''; pieces.innerHTML='';
@@ -576,7 +629,7 @@ const ModeShapes = {
       slot.innerHTML=`<svg viewBox="0 0 110 110" xmlns="http://www.w3.org/2000/svg">${sp.piece()}</svg>`;
       slot.classList.remove('filled'); slot.offsetWidth; slot.classList.add('filled');
       this.placed.add(shape); sparkles(c.x, c.y); SFX.good();
-      if(this.placed.size===3) setTimeout(()=>celebrate(()=>this.start()), 550);
+      if(this.placed.size===this.need){ Levels.next('shapes'); setTimeout(()=>celebrate(()=>this.start()), 550); }
     } else {
       // wrong slot shake
       ['sslot-'].forEach(()=>{});
@@ -623,10 +676,12 @@ function ballSVG(c){
 }
 
 const ModeColors = {
-  placed:new Set(),
+  placed:new Set(), need:3,
   start(){
     this.placed=new Set();
-    const keys=shuffle(pickN(COLOR_KEYS,3));
+    showBadge('colors');
+    this.need = Levels.count('colors', 3, 6);        // 3 → 4 → 5 → 6 colors
+    const keys=shuffle(pickN(COLOR_KEYS,this.need));
     const slots=document.getElementById('colors-slots');
     const pieces=document.getElementById('colors-pieces');
     slots.innerHTML=''; pieces.innerHTML='';
@@ -648,7 +703,7 @@ const ModeColors = {
       el.classList.add('placed');
       slot.classList.remove('idle','filled'); slot.offsetWidth; slot.classList.add('filled');
       this.placed.add(color); sparkles(c.x,c.y); SFX.good();
-      if(this.placed.size===3) setTimeout(()=>celebrate(()=>this.start()),550);
+      if(this.placed.size===this.need){ Levels.next('colors'); setTimeout(()=>celebrate(()=>this.start()),550); }
     } else {
       document.querySelectorAll('#colors-slots .slot').forEach(s=>{
         if(s.dataset.color===color) return;
@@ -666,7 +721,9 @@ const ModeColors = {
    ════════════════════════════════════════════════════════════════ */
 const ModeMatch = {
   start(){
-    const opts=pickN(FACE_KEYS,3);
+    showBadge('match');
+    const n = Levels.count('match', 3, 6);           // 3 → 4 → 5 → 6 choices
+    const opts=pickN(FACE_KEYS,n);
     const answer=opts[Math.floor(Math.random()*opts.length)];
     const tgt=document.getElementById('match-target');
     tgt.innerHTML=faceSVG(answer);
@@ -676,7 +733,7 @@ const ModeMatch = {
       const b=document.createElement('button'); b.className='opt'; b.dataset.key=k;
       b.innerHTML=faceSVG(k);
       b.onclick=()=>{
-        if(k===answer){ const c=centerOf(b); sparkles(c.x,c.y); SFX.good(); setTimeout(()=>celebrate(()=>this.start()),350); }
+        if(k===answer){ const c=centerOf(b); sparkles(c.x,c.y); SFX.good(); Levels.next('match'); setTimeout(()=>celebrate(()=>this.start()),350); }
         else { SFX.wrong(); b.classList.remove('wrong'); b.offsetWidth; b.classList.add('wrong'); }
       };
       panel.appendChild(b);
@@ -689,13 +746,17 @@ const ModeMatch = {
    MODE: Pop (tap floating bubbles)
    ════════════════════════════════════════════════════════════════ */
 const ModePop = {
-  timer:null, score:0, running:false,
+  timer:null, score:0, running:false, goal:6, done:false,
   start(){
-    this.score=0; this.running=true;
-    document.getElementById('pop-score').textContent='タッチ: 0';
+    this.score=0; this.running=true; this.done=false;
+    showBadge('pop');
+    const lvl = Levels.get('pop');
+    this.goal = 5 + (lvl - 1) * 3;                    // more to pop each level
+    const interval = Math.max(450, 900 - (lvl - 1) * 70);
+    document.getElementById('pop-score').textContent = 'タッチ: 0 / ' + this.goal;
     const field=document.getElementById('pop-field'); field.innerHTML='';
     this.spawn(); this.spawn();
-    this.timer=setInterval(()=>this.spawn(), 900);
+    this.timer=setInterval(()=>this.spawn(), interval);
   },
   spawn(){
     if(!this.running) return;
@@ -717,9 +778,17 @@ const ModePop = {
     );
     anim.onfinish=()=>b.remove();
     const pop=(e)=>{ e.preventDefault();
+      if(this.done) return;
       const r=b.getBoundingClientRect(); sparkles(r.left+r.width/2, r.top+r.height/2);
-      SFX.pop(); this.score++; document.getElementById('pop-score').textContent='タッチ: '+this.score;
+      SFX.pop(); this.score++;
+      document.getElementById('pop-score').textContent='タッチ: '+this.score+' / '+this.goal;
       anim.cancel(); b.remove();
+      if(this.score>=this.goal){
+        this.done=true; this.running=false;
+        if(this.timer){ clearInterval(this.timer); this.timer=null; }
+        Levels.next('pop');
+        setTimeout(()=>celebrate(()=>this.start()), 400);
+      }
     };
     b.addEventListener('touchstart', pop, {passive:false});
     b.addEventListener('mousedown', pop);

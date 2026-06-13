@@ -1,0 +1,13 @@
+{
+  "name": "アンパンマン あそび",
+  "short_name": "あそび",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#42AAEE",
+  "theme_color": "#FF6B00",
+  "icons": [
+    { "src": "icon.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}
