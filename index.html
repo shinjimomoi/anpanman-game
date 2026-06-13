@@ -2,684 +2,758 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<title>アンパンマン かたちあわせ</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" content="#FF6B00">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon.png">
+<title>アンパンマン あそび</title>
 <style>
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { min-height: 100vh; font-family: sans-serif; overflow: hidden; user-select: none; position: relative; }
+  :root {
+    --orange:   #FF6B00;
+    --orange-d: #C24E00;
+    --ink:      #2B2B2B;
+    --panel:    rgba(255,255,255,0.24);
+    --panel-bd: rgba(255,255,255,0.45);
+    --font: "Hiragino Maru Gothic ProN","ヒラギノ丸ゴ ProN",
+            "Rounded Mplus 1c", "Segoe UI", system-ui, sans-serif;
+  }
 
-  /* ── Background ── */
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; }
+  body {
+    font-family: var(--font);
+    overflow: hidden;
+    user-select: none; -webkit-user-select: none;
+    position: relative;
+    background: #42AAEE;
+  }
+
+  /* Shared background scene sits behind every screen */
   #bg { position: fixed; inset: 0; z-index: 0; }
 
-  /* ── Game layout ── */
-  #game {
-    position: relative; z-index: 1;
-    min-height: 100vh;
+  /* ── Screen router ── */
+  .screen {
+    position: fixed; inset: 0; z-index: 1;
     display: flex; flex-direction: column;
-    touch-action: none;
+    opacity: 0; visibility: hidden;
+    transform: scale(0.98);
+    transition: opacity 0.3s ease, transform 0.3s ease, visibility 0.3s;
+    padding: env(safe-area-inset-top) env(safe-area-inset-right)
+             env(safe-area-inset-bottom) env(safe-area-inset-left);
   }
+  .screen.active { opacity: 1; visibility: visible; transform: scale(1); }
 
-  #title {
-    text-align: center; padding: 16px 0 6px;
-    font-size: 28px; font-weight: bold; color: #fff;
-    text-shadow: 2px 2px 0 #E05000, -1px -1px 0 #E05000;
-    letter-spacing: 2px; flex-shrink: 0;
-  }
-
-  /* Frosted panels so the background shows through at the sides */
-  #targets-wrap, #pieces-wrap {
-    flex: 1;
+  /* ── Home / back button ── */
+  .home-btn {
+    position: absolute; top: calc(env(safe-area-inset-top) + 10px); left: 12px;
+    z-index: 20;
+    width: 52px; height: 52px; border: none; border-radius: 50%;
+    background: #fff; color: var(--orange);
+    box-shadow: 0 3px 0 rgba(0,0,0,0.18);
+    font-size: 26px; font-weight: bold; cursor: pointer;
     display: flex; align-items: center; justify-content: center;
-    padding: 6px 10px;
   }
-  #targets-panel, #pieces-panel {
+  .home-btn:active { transform: translateY(2px); box-shadow: 0 1px 0 rgba(0,0,0,0.18); }
+
+  /* ── Sound toggle ── */
+  .sound-btn {
+    position: absolute; top: calc(env(safe-area-inset-top) + 10px); right: 12px;
+    z-index: 20;
+    width: 52px; height: 52px; border: none; border-radius: 50%;
+    background: #fff; box-shadow: 0 3px 0 rgba(0,0,0,0.18);
+    font-size: 24px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .sound-btn:active { transform: translateY(2px); box-shadow: 0 1px 0 rgba(0,0,0,0.18); }
+
+  /* ══════════ MENU ══════════ */
+  #screen-menu { justify-content: center; align-items: center; gap: 4vh; }
+  #menu-title {
+    text-align: center; color: #fff;
+    font-size: clamp(30px, 9vw, 46px); font-weight: 800; letter-spacing: 2px;
+    text-shadow: 3px 3px 0 var(--orange), -1.5px -1.5px 0 var(--orange),
+                 1.5px -1.5px 0 var(--orange), -1.5px 1.5px 0 var(--orange);
+  }
+  #menu-sub { color:#fff; font-size:16px; margin-top:-2vh; text-shadow:1px 1px 3px rgba(0,0,0,.3); }
+
+  .card-grid {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 16px;
+    width: min(92vw, 460px);
+  }
+  .card {
+    aspect-ratio: 1 / 0.92;
+    border: none; border-radius: 26px;
+    background: var(--card-c, #fff);
+    box-shadow: 0 6px 0 var(--card-d, #ccc), 0 10px 20px rgba(0,0,0,0.18);
+    cursor: pointer;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 6px; padding: 10px;
+    transition: transform 0.08s;
+  }
+  .card:active { transform: translateY(4px); box-shadow: 0 2px 0 var(--card-d,#ccc), 0 4px 10px rgba(0,0,0,0.18); }
+  .card svg { width: 64px; height: 64px; }
+  .card-label { font-size: 22px; font-weight: 800; color: #fff; text-shadow: 1px 1px 0 rgba(0,0,0,0.15); }
+
+  /* ══════════ Game frames ══════════ */
+  .game-title {
+    text-align: center; padding: 14px 64px 4px; flex-shrink: 0;
+    color: #fff; font-size: 24px; font-weight: 800; letter-spacing: 1px;
+    text-shadow: 2px 2px 0 var(--orange-d), -1px -1px 0 var(--orange-d);
+  }
+
+  .row-wrap { flex: 1; display: flex; align-items: center; justify-content: center; padding: 6px 10px; }
+  .panel {
     width: 100%;
-    background: rgba(255,255,255,0.22);
-    backdrop-filter: blur(5px);
-    -webkit-backdrop-filter: blur(5px);
-    border-radius: 24px;
-    border: 1.5px solid rgba(255,255,255,0.4);
+    background: var(--panel); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+    border: 1.5px solid var(--panel-bd); border-radius: 24px;
     display: flex; align-items: center; justify-content: space-around;
-    padding: 14px 8px;
+    padding: 16px 8px;
   }
+  .hint { text-align: center; font-size: 17px; color: #fff; flex-shrink: 0;
+          text-shadow: 1px 1px 3px rgba(0,0,0,0.35); padding: 2px; }
 
-  #divider {
-    text-align: center; font-size: 18px; color: #fff;
-    text-shadow: 1px 1px 3px rgba(0,0,0,0.35);
-    padding: 0; flex-shrink: 0;
-  }
+  /* slots / pieces */
+  .slot { width: 118px; height: 118px; display:flex; align-items:center; justify-content:center;
+          filter: drop-shadow(0 3px 6px rgba(0,0,0,0.16)); }
+  .slot.idle { animation: pulse 2.2s ease-in-out infinite; }
+  .slot.filled { animation: pop 0.35s ease forwards; }
+  .slot svg { width:100%; height:100%; }
 
-  /* ── Targets ── */
-  .target {
-    width: 120px; height: 120px;
-    display: flex; align-items: center; justify-content: center;
-    filter: drop-shadow(0 3px 6px rgba(0,0,0,0.15));
-    animation: pulse 2.2s ease-in-out infinite;
-  }
-  .target.filled { animation: pop 0.35s ease forwards; }
-  .target svg { width: 100%; height: 100%; }
-
-  @keyframes pulse {
-    0%,100% { transform: scale(1); }
-    50%      { transform: scale(1.06); }
-  }
-  @keyframes pop {
-    0%   { transform: scale(1); }
-    45%  { transform: scale(1.22); }
-    100% { transform: scale(1); }
-  }
-
-  /* ── Pieces ── */
-  .piece {
-    width: 110px; height: 110px;
-    touch-action: none;
-    filter: drop-shadow(2px 4px 6px rgba(0,0,0,0.28));
-    cursor: grab;
-    transition: opacity 0.2s;
-  }
-  .piece svg { width: 100%; height: 100%; display: block; }
+  .piece { width: 104px; height: 104px; touch-action: none; cursor: grab;
+           filter: drop-shadow(2px 4px 6px rgba(0,0,0,0.28)); transition: opacity 0.2s; }
+  .piece svg { width:100%; height:100%; display:block; }
   .piece.placed { opacity: 0 !important; pointer-events: none; }
 
-  /* Ghost: positioned once, moved only via transform */
-  .piece-ghost {
-    position: fixed; z-index: 1000; pointer-events: none;
-    touch-action: none;
-    will-change: transform;
-    filter: drop-shadow(4px 8px 12px rgba(0,0,0,0.45));
-    cursor: grabbing;
-  }
-  .piece-ghost svg { width: 100%; height: 100%; display: block; }
+  .piece-ghost { position: fixed; z-index: 1000; pointer-events: none; touch-action: none;
+                 will-change: transform; filter: drop-shadow(4px 8px 12px rgba(0,0,0,0.45)); }
+  .piece-ghost svg { width:100%; height:100%; display:block; }
 
-  /* ── Celebration ── */
-  #celebration {
-    display: none; position: fixed; inset: 0;
-    background: rgba(255,240,60,0.88); z-index: 9999;
-    flex-direction: column; align-items: center; justify-content: center; gap: 18px;
-  }
-  #celebration.show { display: flex; }
-  #celebration .big-text {
-    font-size: 52px; font-weight: bold; color: #E05000;
-    text-shadow: 3px 3px 0 #fff; animation: bounce 0.5s infinite alternate;
-  }
-  @keyframes bounce { from{transform:scale(1) rotate(-3deg)} to{transform:scale(1.12) rotate(3deg)} }
-  #celebration .anpan-big { width: 160px; height: 160px; }
-  #play-again {
-    background: #E05000; color: #fff; border: none; border-radius: 50px;
-    font-size: 24px; font-weight: bold; padding: 14px 44px;
-    cursor: pointer; box-shadow: 0 4px 0 #903000;
-  }
-  #play-again:active { transform: translateY(3px); box-shadow: 0 1px 0 #903000; }
+  /* match-mode option buttons */
+  .opt { width: 110px; height: 110px; border: none; background: transparent; cursor: pointer;
+         filter: drop-shadow(2px 4px 6px rgba(0,0,0,0.28)); transition: transform 0.1s; touch-action: manipulation; }
+  .opt:active { transform: scale(0.92); }
+  .opt svg { width:100%; height:100%; }
+  .opt.wrong { animation: shake 0.32s ease; }
+  .target-big { width: 150px; height: 150px; filter: drop-shadow(0 4px 8px rgba(0,0,0,0.2)); }
+  .target-big svg { width:100%; height:100%; }
 
-  /* ── Stars / particles ── */
-  .sparkle {
-    position: fixed; font-size: 36px; pointer-events: none; z-index: 9998;
-    animation: sparkfly 1.1s ease-out forwards;
-  }
-  @keyframes sparkfly {
-    from { opacity: 1; transform: scale(0.4) translateY(0); }
-    to   { opacity: 0; transform: scale(1.6) translateY(-140px); }
-  }
+  /* pop-mode bubbles */
+  #pop-field { position: absolute; inset: 0; overflow: hidden; z-index: 1; }
+  .bubble { position: absolute; bottom: -130px; will-change: transform; cursor: pointer; touch-action: manipulation; }
+  .bubble svg { width: 100%; height: 100%; display:block; pointer-events: none; }
+  .bubble .ring { position:absolute; inset:-6px; border-radius:50%; background: rgba(255,255,255,0.25); }
+  #pop-score { position: absolute; bottom: calc(env(safe-area-inset-bottom) + 14px); left: 0; right: 0;
+               text-align:center; color:#fff; font-size:20px; font-weight:800; z-index:5;
+               text-shadow: 1px 1px 3px rgba(0,0,0,0.4); }
 
-  @keyframes shake {
-    0%,100% { transform: translateX(0); }
-    25%     { transform: translateX(-12px); }
-    75%     { transform: translateX(12px); }
-  }
+  /* ── animations ── */
+  @keyframes pulse { 0%,100%{transform:scale(1)} 50%{transform:scale(1.06)} }
+  @keyframes pop   { 0%{transform:scale(1)} 45%{transform:scale(1.22)} 100%{transform:scale(1)} }
+  @keyframes shake { 0%,100%{transform:translateX(0)} 25%{transform:translateX(-12px)} 75%{transform:translateX(12px)} }
+
+  /* ── celebration overlay ── */
+  #celebration { display:none; position:fixed; inset:0; z-index:9999;
+                 background: rgba(255,240,60,0.9);
+                 flex-direction:column; align-items:center; justify-content:center; gap:18px; }
+  #celebration.show { display:flex; }
+  #celebration .big { font-size: clamp(38px,12vw,56px); font-weight:800; color:var(--orange-d);
+                      text-shadow:3px 3px 0 #fff; animation: bb 0.5s infinite alternate; }
+  @keyframes bb { from{transform:scale(1) rotate(-3deg)} to{transform:scale(1.12) rotate(3deg)} }
+  #celebration svg { width:160px; height:160px; }
+  #cele-btns { display:flex; gap:14px; }
+  .cele-btn { border:none; border-radius:50px; font-size:22px; font-weight:800; padding:14px 30px;
+              cursor:pointer; color:#fff; }
+  .cele-next { background:var(--orange); box-shadow:0 4px 0 var(--orange-d); }
+  .cele-home { background:#5aa9e6; box-shadow:0 4px 0 #3a7fb5; }
+  .cele-btn:active { transform: translateY(3px); }
+
+  .sparkle { position: fixed; font-size: 36px; pointer-events: none; z-index: 9998;
+             animation: spk 1.1s ease-out forwards; }
+  @keyframes spk { from{opacity:1; transform:scale(0.4) translateY(0)}
+                   to  {opacity:0; transform:scale(1.6) translateY(-140px)} }
 </style>
 </head>
 <body>
 
-<!-- ══════════════════════════════════════════
-     BACKGROUND SCENE  (390 × 844 = iPhone 14 native)
-     buildings positioned mid-screen so they show
-     through the frosted game panels
-     ══════════════════════════════════════════ -->
-<svg id="bg" viewBox="0 0 390 844" preserveAspectRatio="xMidYMid slice"
-     xmlns="http://www.w3.org/2000/svg">
+<!-- ════════ SHARED BACKGROUND ════════ -->
+<svg id="bg" viewBox="0 0 390 844" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg">
   <defs>
     <linearGradient id="gSky" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%"   stop-color="#42AAEE"/>
-      <stop offset="70%"  stop-color="#B8E4FF"/>
-      <stop offset="100%" stop-color="#A0D870"/>
+      <stop offset="0%" stop-color="#42AAEE"/><stop offset="70%" stop-color="#B8E4FF"/><stop offset="100%" stop-color="#A0D870"/>
     </linearGradient>
     <radialGradient id="gSun" cx="50%" cy="50%" r="50%">
-      <stop offset="0%"   stop-color="#FFED80"/>
-      <stop offset="100%" stop-color="#FFB800" stop-opacity="0"/>
+      <stop offset="0%" stop-color="#FFED80"/><stop offset="100%" stop-color="#FFB800" stop-opacity="0"/>
     </radialGradient>
     <linearGradient id="gGround" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%"   stop-color="#74CC74"/>
-      <stop offset="100%" stop-color="#52A852"/>
+      <stop offset="0%" stop-color="#74CC74"/><stop offset="100%" stop-color="#52A852"/>
     </linearGradient>
   </defs>
-
-  <!-- Sky -->
   <rect width="390" height="844" fill="url(#gSky)"/>
-
-  <!-- Ground -->
   <ellipse cx="195" cy="700" rx="280" ry="60" fill="#84D484"/>
   <rect y="706" width="390" height="138" fill="url(#gGround)"/>
-
-  <!-- Sun -->
   <circle cx="340" cy="74" r="58" fill="url(#gSun)" opacity="0.8"/>
   <circle cx="340" cy="74" r="34" fill="#FFD600"/>
   <g stroke="#FFD600" stroke-width="3.5" stroke-linecap="round">
-    <line x1="340" y1="30"  x2="340" y2="16"/>
-    <line x1="340" y1="118" x2="340" y2="132"/>
-    <line x1="296" y1="74"  x2="282" y2="74"/>
-    <line x1="384" y1="74"  x2="390" y2="74"/>
-    <line x1="308" y1="42"  x2="298" y2="32"/>
-    <line x1="372" y1="106" x2="382" y2="116"/>
-    <line x1="372" y1="42"  x2="382" y2="32"/>
-    <line x1="308" y1="106" x2="298" y2="116"/>
+    <line x1="340" y1="30" x2="340" y2="16"/><line x1="340" y1="118" x2="340" y2="132"/>
+    <line x1="296" y1="74" x2="282" y2="74"/><line x1="384" y1="74" x2="390" y2="74"/>
+    <line x1="308" y1="42" x2="298" y2="32"/><line x1="372" y1="106" x2="382" y2="116"/>
+    <line x1="372" y1="42" x2="382" y2="32"/><line x1="308" y1="106" x2="298" y2="116"/>
   </g>
-
-  <!-- Clouds -->
-  <g fill="white" opacity="0.94">
-    <ellipse cx="58"  cy="100" rx="38" ry="21"/>
-    <ellipse cx="88"  cy="90"  rx="32" ry="19"/>
-    <ellipse cx="28"  cy="106" rx="24" ry="15"/>
-  </g>
-  <g fill="white" opacity="0.80">
-    <ellipse cx="205" cy="62"  rx="30" ry="17"/>
-    <ellipse cx="230" cy="54"  rx="24" ry="15"/>
-    <ellipse cx="182" cy="66"  rx="20" ry="13"/>
-  </g>
-  <g fill="white" opacity="0.60">
-    <ellipse cx="150" cy="130" rx="22" ry="12"/>
-    <ellipse cx="168" cy="123" rx="16" ry="11"/>
-  </g>
-
-  <!-- ══ Bakery – left side, tall so visible behind target+piece rows ══ -->
-  <!-- Body -->
-  <rect x="8"  y="370" width="100" height="336" rx="5" fill="#F5DEB3"/>
-  <!-- Roof -->
+  <g fill="white" opacity="0.94"><ellipse cx="58" cy="100" rx="38" ry="21"/><ellipse cx="88" cy="90" rx="32" ry="19"/><ellipse cx="28" cy="106" rx="24" ry="15"/></g>
+  <g fill="white" opacity="0.80"><ellipse cx="205" cy="62" rx="30" ry="17"/><ellipse cx="230" cy="54" rx="24" ry="15"/><ellipse cx="182" cy="66" rx="20" ry="13"/></g>
+  <!-- Bakery -->
+  <rect x="8" y="370" width="100" height="336" rx="5" fill="#F5DEB3"/>
   <polygon points="0,374 116,374 58,302" fill="#D94040"/>
-  <!-- Chimney -->
-  <rect x="72" y="284" width="14" height="28" fill="#B03030"/>
-  <rect x="70" y="280" width="18" height="8" rx="2" fill="#A02020"/>
-  <!-- Smoke -->
-  <circle cx="79" cy="266" r="8"  fill="white" opacity="0.72"/>
-  <circle cx="84" cy="251" r="6"  fill="white" opacity="0.54"/>
-  <circle cx="78" cy="238" r="4"  fill="white" opacity="0.36"/>
-  <!-- Sign -->
+  <rect x="72" y="284" width="14" height="28" fill="#B03030"/><rect x="70" y="280" width="18" height="8" rx="2" fill="#A02020"/>
+  <circle cx="79" cy="266" r="8" fill="white" opacity="0.72"/><circle cx="84" cy="251" r="6" fill="white" opacity="0.54"/><circle cx="78" cy="238" r="4" fill="white" opacity="0.36"/>
   <rect x="12" y="386" width="80" height="22" rx="5" fill="#E05000"/>
   <text x="52" y="401" text-anchor="middle" font-size="11" font-weight="bold" fill="white" font-family="sans-serif">パン工場</text>
-  <!-- Windows row 1 -->
-  <rect x="14" y="420" width="32" height="30" rx="5" fill="#87CEEB"/>
-  <line x1="30"  y1="420" x2="30"  y2="450" stroke="white" stroke-width="2"/>
-  <line x1="14"  y1="435" x2="46"  y2="435" stroke="white" stroke-width="2"/>
-  <rect x="58" y="420" width="32" height="30" rx="5" fill="#87CEEB"/>
-  <line x1="74"  y1="420" x2="74"  y2="450" stroke="white" stroke-width="2"/>
-  <line x1="58"  y1="435" x2="90"  y2="435" stroke="white" stroke-width="2"/>
-  <!-- Windows row 2 -->
-  <rect x="14" y="502" width="32" height="30" rx="5" fill="#87CEEB"/>
-  <line x1="30"  y1="502" x2="30"  y2="532" stroke="white" stroke-width="2"/>
-  <line x1="14"  y1="517" x2="46"  y2="517" stroke="white" stroke-width="2"/>
-  <rect x="58" y="502" width="32" height="30" rx="5" fill="#87CEEB"/>
-  <line x1="74"  y1="502" x2="74"  y2="532" stroke="white" stroke-width="2"/>
-  <line x1="58"  y1="517" x2="90"  y2="517" stroke="white" stroke-width="2"/>
-  <!-- Door -->
-  <rect x="38" y="624" width="28" height="46" rx="14" fill="#8B4513"/>
-  <circle cx="62" cy="650" r="3" fill="#FFD700"/>
-
-  <!-- ══ House – right side ══ -->
+  <rect x="14" y="420" width="32" height="30" rx="5" fill="#87CEEB"/><line x1="30" y1="420" x2="30" y2="450" stroke="white" stroke-width="2"/><line x1="14" y1="435" x2="46" y2="435" stroke="white" stroke-width="2"/>
+  <rect x="58" y="420" width="32" height="30" rx="5" fill="#87CEEB"/><line x1="74" y1="420" x2="74" y2="450" stroke="white" stroke-width="2"/><line x1="58" y1="435" x2="90" y2="435" stroke="white" stroke-width="2"/>
+  <rect x="14" y="502" width="32" height="30" rx="5" fill="#87CEEB"/><line x1="30" y1="502" x2="30" y2="532" stroke="white" stroke-width="2"/><line x1="14" y1="517" x2="46" y2="517" stroke="white" stroke-width="2"/>
+  <rect x="58" y="502" width="32" height="30" rx="5" fill="#87CEEB"/><line x1="74" y1="502" x2="74" y2="532" stroke="white" stroke-width="2"/><line x1="58" y1="517" x2="90" y2="517" stroke="white" stroke-width="2"/>
+  <rect x="38" y="624" width="28" height="46" rx="14" fill="#8B4513"/><circle cx="62" cy="650" r="3" fill="#FFD700"/>
+  <!-- House -->
   <rect x="282" y="400" width="108" height="306" rx="5" fill="#FFF0D0"/>
-  <!-- Roof -->
   <polygon points="274,404 398,404 336,330" fill="#3366BB"/>
-  <!-- Chimney -->
-  <rect x="354" y="316" width="13" height="24" fill="#2255AA"/>
-  <rect x="352" y="312" width="17" height="8" rx="2" fill="#1A4499"/>
-  <!-- Windows row 1 -->
-  <rect x="286" y="430" width="30" height="28" rx="5" fill="#87CEEB"/>
-  <line x1="301" y1="430" x2="301" y2="458" stroke="white" stroke-width="2"/>
-  <line x1="286" y1="444" x2="316" y2="444" stroke="white" stroke-width="2"/>
-  <rect x="352" y="430" width="30" height="28" rx="5" fill="#87CEEB"/>
-  <line x1="367" y1="430" x2="367" y2="458" stroke="white" stroke-width="2"/>
-  <line x1="352" y1="444" x2="382" y2="444" stroke="white" stroke-width="2"/>
-  <!-- Windows row 2 -->
-  <rect x="286" y="516" width="30" height="28" rx="5" fill="#87CEEB"/>
-  <line x1="301" y1="516" x2="301" y2="544" stroke="white" stroke-width="2"/>
-  <line x1="286" y1="530" x2="316" y2="530" stroke="white" stroke-width="2"/>
-  <rect x="352" y="516" width="30" height="28" rx="5" fill="#87CEEB"/>
-  <line x1="367" y1="516" x2="367" y2="544" stroke="white" stroke-width="2"/>
-  <line x1="352" y1="530" x2="382" y2="530" stroke="white" stroke-width="2"/>
-  <!-- Door -->
-  <rect x="322" y="618" width="24" height="40" rx="12" fill="#7A5A14"/>
-  <circle cx="342" cy="640" r="3" fill="#FFD700"/>
-
-  <!-- Path between buildings -->
+  <rect x="354" y="316" width="13" height="24" fill="#2255AA"/><rect x="352" y="312" width="17" height="8" rx="2" fill="#1A4499"/>
+  <rect x="286" y="430" width="30" height="28" rx="5" fill="#87CEEB"/><line x1="301" y1="430" x2="301" y2="458" stroke="white" stroke-width="2"/><line x1="286" y1="444" x2="316" y2="444" stroke="white" stroke-width="2"/>
+  <rect x="352" y="430" width="30" height="28" rx="5" fill="#87CEEB"/><line x1="367" y1="430" x2="367" y2="458" stroke="white" stroke-width="2"/><line x1="352" y1="444" x2="382" y2="444" stroke="white" stroke-width="2"/>
+  <rect x="286" y="516" width="30" height="28" rx="5" fill="#87CEEB"/><line x1="301" y1="516" x2="301" y2="544" stroke="white" stroke-width="2"/><line x1="286" y1="530" x2="316" y2="530" stroke="white" stroke-width="2"/>
+  <rect x="352" y="516" width="30" height="28" rx="5" fill="#87CEEB"/><line x1="367" y1="516" x2="367" y2="544" stroke="white" stroke-width="2"/><line x1="352" y1="530" x2="382" y2="530" stroke="white" stroke-width="2"/>
+  <rect x="322" y="618" width="24" height="40" rx="12" fill="#7A5A14"/><circle cx="342" cy="640" r="3" fill="#FFD700"/>
   <rect x="174" y="700" width="40" height="70" fill="#C8A96E" opacity="0.4"/>
   <ellipse cx="194" cy="706" rx="60" ry="12" fill="#C8A96E" opacity="0.28"/>
-
-  <!-- Flowers left cluster -->
-  <line x1="132" y1="710" x2="132" y2="726" stroke="#2A6A2A" stroke-width="2.5"/>
-  <circle cx="132" cy="706" r="6"  fill="#FF4488"/>
-  <circle cx="124" cy="702" r="5"  fill="#FF88AA"/>
-  <circle cx="140" cy="702" r="5"  fill="#FF1155"/>
-  <line x1="156" y1="708" x2="156" y2="724" stroke="#2A6A2A" stroke-width="2.5"/>
-  <circle cx="156" cy="704" r="6"  fill="#FFD700"/>
-  <circle cx="148" cy="700" r="5"  fill="#FFF080"/>
-  <circle cx="164" cy="700" r="5"  fill="#FFAA00"/>
-
-  <!-- Flowers right cluster -->
-  <line x1="236" y1="708" x2="236" y2="724" stroke="#2A6A2A" stroke-width="2.5"/>
-  <circle cx="236" cy="704" r="6"  fill="#FF88BB"/>
-  <circle cx="228" cy="700" r="5"  fill="#FFAAD0"/>
-  <circle cx="244" cy="700" r="5"  fill="#FF5599"/>
-  <line x1="260" y1="710" x2="260" y2="726" stroke="#2A6A2A" stroke-width="2.5"/>
-  <circle cx="260" cy="706" r="6"  fill="#FF6B00"/>
-  <circle cx="252" cy="702" r="5"  fill="#FFB060"/>
-  <circle cx="268" cy="702" r="5"  fill="#FF9900"/>
-
-  <!-- Grass tufts -->
+  <line x1="132" y1="710" x2="132" y2="726" stroke="#2A6A2A" stroke-width="2.5"/><circle cx="132" cy="706" r="6" fill="#FF4488"/><circle cx="124" cy="702" r="5" fill="#FF88AA"/><circle cx="140" cy="702" r="5" fill="#FF1155"/>
+  <line x1="156" y1="708" x2="156" y2="724" stroke="#2A6A2A" stroke-width="2.5"/><circle cx="156" cy="704" r="6" fill="#FFD700"/><circle cx="148" cy="700" r="5" fill="#FFF080"/><circle cx="164" cy="700" r="5" fill="#FFAA00"/>
+  <line x1="236" y1="708" x2="236" y2="724" stroke="#2A6A2A" stroke-width="2.5"/><circle cx="236" cy="704" r="6" fill="#FF88BB"/><circle cx="228" cy="700" r="5" fill="#FFAAD0"/><circle cx="244" cy="700" r="5" fill="#FF5599"/>
+  <line x1="260" y1="710" x2="260" y2="726" stroke="#2A6A2A" stroke-width="2.5"/><circle cx="260" cy="706" r="6" fill="#FF6B00"/><circle cx="252" cy="702" r="5" fill="#FFB060"/><circle cx="268" cy="702" r="5" fill="#FF9900"/>
   <g stroke="#2A6A2A" stroke-width="2.5" stroke-linecap="round" fill="none">
-    <path d="M 110 708 Q 114 696 118 708"/>
-    <path d="M 118 706 Q 122 694 126 706"/>
-    <path d="M 194 706 Q 198 694 202 706"/>
-    <path d="M 278 708 Q 282 696 286 708"/>
-    <path d="M 350 706 Q 354 694 358 706"/>
+    <path d="M 110 708 Q 114 696 118 708"/><path d="M 118 706 Q 122 694 126 706"/><path d="M 194 706 Q 198 694 202 706"/><path d="M 278 708 Q 282 696 286 708"/><path d="M 350 706 Q 354 694 358 706"/>
   </g>
 </svg>
 
-<!-- ══════════════════════════════════════════
-     GAME UI
-     ══════════════════════════════════════════ -->
-<div id="game">
-  <div id="title">&#11088; かたちあわせ &#11088;</div>
-
-  <!-- Targets row -->
-  <div id="targets-wrap">
-    <div id="targets-panel">
-
-      <!-- ○ Anpanman target -->
-      <div class="target" id="target-circle" data-shape="circle">
-        <svg viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
-          <circle cx="60" cy="60" r="52" fill="rgba(255,255,255,0.3)"
-            stroke="rgba(255,255,255,0.7)" stroke-width="9"/>
-          <circle cx="60" cy="60" r="52" fill="none"
-            stroke="#FF6B00" stroke-width="5" stroke-dasharray="11 7"/>
-        </svg>
-      </div>
-
-      <!-- □ Shokupanman target -->
-      <div class="target" id="target-square" data-shape="square">
-        <svg viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
-          <rect x="9" y="9" width="102" height="102" rx="16"
-            fill="rgba(255,255,255,0.3)"
-            stroke="rgba(255,255,255,0.7)" stroke-width="9"/>
-          <rect x="9" y="9" width="102" height="102" rx="16"
-            fill="none" stroke="#4466FF" stroke-width="5" stroke-dasharray="11 7"/>
-        </svg>
-      </div>
-
-      <!-- ★ Baikinman target (5-point star, shallower inner) -->
-      <!-- outer r=52 inner r=24, center 60,60 -->
-      <!-- Outer: 60,8  111,42  91,103  29,103  9,42 -->
-      <!-- Inner: 73,40  83,67  60,83  37,67  47,40 -->
-      <div class="target" id="target-star" data-shape="star">
-        <svg viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
-          <polygon
-            points="60,8 73,40 111,42 83,67 91,103 60,83 29,103 37,67 9,42 47,40"
-            fill="rgba(255,255,255,0.3)"
-            stroke="rgba(255,255,255,0.75)" stroke-width="9"/>
-          <polygon
-            points="60,8 73,40 111,42 83,67 91,103 60,83 29,103 37,67 9,42 47,40"
-            fill="none" stroke="#9933CC" stroke-width="5" stroke-dasharray="11 7"/>
-        </svg>
-      </div>
-
-    </div>
+<!-- ════════ MENU ════════ -->
+<section id="screen-menu" class="screen active">
+  <h1 id="menu-title">アンパンマン<br>あそび</h1>
+  <div class="card-grid">
+    <button class="card" data-go="shapes" style="--card-c:#FF7A3D;--card-d:#C24E00;">
+      <svg viewBox="0 0 100 100"><circle cx="28" cy="34" r="16" fill="#fff"/><rect x="54" y="20" width="30" height="30" rx="6" fill="#fff"/><polygon points="50,56 70,92 30,92" fill="#fff"/></svg>
+      <span class="card-label">かたち</span>
+    </button>
+    <button class="card" data-go="colors" style="--card-c:#4D9BFF;--card-d:#2E6FBF;">
+      <svg viewBox="0 0 100 100"><circle cx="34" cy="36" r="18" fill="#FF5A5A"/><circle cx="66" cy="36" r="18" fill="#FFC83D"/><circle cx="34" cy="66" r="18" fill="#5FC96A"/><circle cx="66" cy="66" r="18" fill="#fff"/></svg>
+      <span class="card-label">いろ</span>
+    </button>
+    <button class="card" data-go="match" style="--card-c:#7DCB5A;--card-d:#56913C;">
+      <svg viewBox="0 0 100 100"><circle cx="32" cy="50" r="22" fill="#fff"/><circle cx="68" cy="50" r="22" fill="#fff"/><circle cx="26" cy="46" r="3.5" fill="#2B2B2B"/><circle cx="38" cy="46" r="3.5" fill="#2B2B2B"/><circle cx="62" cy="46" r="3.5" fill="#2B2B2B"/><circle cx="74" cy="46" r="3.5" fill="#2B2B2B"/></svg>
+      <span class="card-label">おなじ</span>
+    </button>
+    <button class="card" data-go="pop" style="--card-c:#C26BD8;--card-d:#8E47A0;">
+      <svg viewBox="0 0 100 100"><circle cx="38" cy="40" r="20" fill="#fff" opacity="0.95"/><circle cx="68" cy="62" r="14" fill="#fff" opacity="0.8"/><circle cx="30" cy="70" r="10" fill="#fff" opacity="0.7"/></svg>
+      <span class="card-label">タッチ</span>
+    </button>
   </div>
+  <button class="sound-btn" id="sound-menu">🔊</button>
+</section>
 
-  <div id="divider">&#8593; ここにおこう &#8593;</div>
+<!-- ════════ SHAPES ════════ -->
+<section id="screen-shapes" class="screen">
+  <button class="home-btn" data-go="menu">⌂</button>
+  <button class="sound-btn snd">🔊</button>
+  <div class="game-title">かたち あわせ</div>
+  <div class="row-wrap"><div class="panel" id="shapes-slots"></div></div>
+  <div class="hint">↑ おなじ かたちに おこう</div>
+  <div class="row-wrap"><div class="panel" id="shapes-pieces"></div></div>
+</section>
 
-  <!-- Pieces row -->
-  <div id="pieces-wrap">
-    <div id="pieces-panel">
+<!-- ════════ COLORS ════════ -->
+<section id="screen-colors" class="screen">
+  <button class="home-btn" data-go="menu">⌂</button>
+  <button class="sound-btn snd">🔊</button>
+  <div class="game-title">いろ あわせ</div>
+  <div class="row-wrap"><div class="panel" id="colors-slots"></div></div>
+  <div class="hint">↑ おなじ いろに おこう</div>
+  <div class="row-wrap"><div class="panel" id="colors-pieces"></div></div>
+</section>
 
-      <!-- Anpanman (circle face) -->
-      <div class="piece" id="piece-circle" data-shape="circle">
-        <svg viewBox="0 0 110 110" xmlns="http://www.w3.org/2000/svg">
-          <circle cx="55" cy="55" r="50" fill="#F4A828"/>
-          <circle cx="33" cy="64" r="12" fill="#FF5555" opacity="0.76"/>
-          <circle cx="77" cy="64" r="12" fill="#FF5555" opacity="0.76"/>
-          <ellipse cx="39" cy="47" rx="7" ry="8" fill="#1A1A1A"/>
-          <ellipse cx="71" cy="47" rx="7" ry="8" fill="#1A1A1A"/>
-          <circle cx="42" cy="44" r="2.5" fill="#fff"/>
-          <circle cx="74" cy="44" r="2.5" fill="#fff"/>
-          <ellipse cx="55" cy="60" rx="5" ry="4" fill="#C8540A"/>
-          <path d="M 38 74 Q 55 88 72 74" stroke="#1A1A1A" stroke-width="3.5" fill="none" stroke-linecap="round"/>
-        </svg>
-      </div>
+<!-- ════════ MATCH ════════ -->
+<section id="screen-match" class="screen">
+  <button class="home-btn" data-go="menu">⌂</button>
+  <button class="sound-btn snd">🔊</button>
+  <div class="game-title">おなじは どれ？</div>
+  <div class="row-wrap"><div class="target-big" id="match-target"></div></div>
+  <div class="hint">↓ おなじ こを えらんでね</div>
+  <div class="row-wrap"><div class="panel" id="match-opts"></div></div>
+</section>
 
-      <!-- Shokupanman (square face) -->
-      <div class="piece" id="piece-square" data-shape="square">
-        <svg viewBox="0 0 110 110" xmlns="http://www.w3.org/2000/svg">
-          <rect x="6" y="10" width="98" height="90" rx="16" fill="#F5E6C8"/>
-          <rect x="6" y="10" width="98" height="35" rx="16" fill="#E8C870"/>
-          <ellipse cx="38" cy="56" rx="7" ry="8" fill="#1A1A1A"/>
-          <ellipse cx="72" cy="56" rx="7" ry="8" fill="#1A1A1A"/>
-          <circle cx="41" cy="53" r="2.5" fill="#fff"/>
-          <circle cx="75" cy="53" r="2.5" fill="#fff"/>
-          <circle cx="26" cy="70" r="11" fill="#FF9090" opacity="0.68"/>
-          <circle cx="84" cy="70" r="11" fill="#FF9090" opacity="0.68"/>
-          <ellipse cx="55" cy="66" rx="5" ry="4" fill="#C8986A"/>
-          <path d="M 38 80 Q 55 93 72 80" stroke="#1A1A1A" stroke-width="3.5" fill="none" stroke-linecap="round"/>
-        </svg>
-      </div>
+<!-- ════════ POP ════════ -->
+<section id="screen-pop" class="screen">
+  <button class="home-btn" data-go="menu">⌂</button>
+  <button class="sound-btn snd">🔊</button>
+  <div class="game-title">タッチ して あそぼう</div>
+  <div id="pop-field"></div>
+  <div id="pop-score">タッチ: 0</div>
+</section>
 
-      <!-- Baikinman (star silhouette) -->
-      <!-- Star outer r=44 inner r=20, center 55,55 -->
-      <!-- Outer: 55,11  98,39  81,89  29,89  12,39 -->
-      <!-- Inner: 67,37  76,61  55,73  34,61  43,37 -->
-      <div class="piece" id="piece-star" data-shape="star">
-        <svg viewBox="0 0 110 110" xmlns="http://www.w3.org/2000/svg">
-          <!-- Star body with dark outline -->
-          <polygon points="55,11 67,37 98,39 76,61 81,89 55,73 29,89 34,61 12,39 43,37"
-            fill="#6633AA" stroke="#330066" stroke-width="1.5"/>
-          <!-- Face circle (smaller than before so star tips are clearly visible) -->
-          <circle cx="55" cy="55" r="19" fill="#9966CC"/>
-          <!-- Bat-wing horns off the top-left and top-right star points -->
-          <polygon points="12,39 2,6  34,32" fill="#6633AA" stroke="#330066" stroke-width="1"/>
-          <polygon points="98,39 108,6 76,32" fill="#6633AA" stroke="#330066" stroke-width="1"/>
-          <!-- Horn tips -->
-          <circle cx="2"   cy="6"  r="4.5" fill="#FFD700"/>
-          <circle cx="108" cy="6"  r="4.5" fill="#FFD700"/>
-          <!-- Eyes -->
-          <ellipse cx="46" cy="53" rx="7" ry="6.5" fill="#fff"/>
-          <ellipse cx="64" cy="53" rx="7" ry="6.5" fill="#fff"/>
-          <ellipse cx="46" cy="54" rx="4.5" ry="5" fill="#1A1A1A"/>
-          <ellipse cx="64" cy="54" rx="4.5" ry="5" fill="#1A1A1A"/>
-          <circle cx="48" cy="52" r="1.8" fill="#fff"/>
-          <circle cx="66" cy="52" r="1.8" fill="#fff"/>
-          <!-- Angry unibrow -->
-          <path d="M 36 46 Q 46 41 56 45" stroke="#1A1A1A" stroke-width="2.5" fill="none"/>
-          <path d="M 54 45 Q 64 41 74 46" stroke="#1A1A1A" stroke-width="2.5" fill="none"/>
-          <!-- Grin + fangs -->
-          <path d="M 38 65 Q 55 75 72 65" stroke="#1A1A1A" stroke-width="2.5" fill="none" stroke-linecap="round"/>
-          <polygon points="46,67 49,75 52,67" fill="#fff"/>
-          <polygon points="52,67 55,75 58,67" fill="#fff"/>
-        </svg>
-      </div>
-
-    </div>
-  </div>
-</div>
-
-<!-- Celebration screen -->
+<!-- ════════ CELEBRATION ════════ -->
 <div id="celebration">
-  <div class="big-text">やったー！🎉</div>
-  <svg class="anpan-big" viewBox="0 0 160 160" xmlns="http://www.w3.org/2000/svg">
-    <circle cx="80" cy="80" r="72" fill="#F4A828"/>
-    <circle cx="50" cy="94" r="16" fill="#FF5555" opacity="0.78"/>
-    <circle cx="110" cy="94" r="16" fill="#FF5555" opacity="0.78"/>
-    <ellipse cx="62" cy="70" rx="11" ry="12" fill="#1A1A1A"/>
-    <ellipse cx="98" cy="70" rx="11" ry="12" fill="#1A1A1A"/>
-    <circle cx="66" cy="66" r="4" fill="#fff"/>
-    <circle cx="102" cy="66" r="4" fill="#fff"/>
-    <ellipse cx="80" cy="86" rx="7" ry="6" fill="#C8540A"/>
-    <path d="M 56 106 Q 80 124 104 106" stroke="#1A1A1A" stroke-width="5" fill="none" stroke-linecap="round"/>
-  </svg>
-  <button id="play-again">もういちど！</button>
+  <div class="big">やったー！🎉</div>
+  <svg viewBox="0 0 160 160"><circle cx="80" cy="80" r="72" fill="#F4A828"/><circle cx="50" cy="94" r="16" fill="#FF5555" opacity="0.78"/><circle cx="110" cy="94" r="16" fill="#FF5555" opacity="0.78"/><ellipse cx="62" cy="70" rx="11" ry="12" fill="#1A1A1A"/><ellipse cx="98" cy="70" rx="11" ry="12" fill="#1A1A1A"/><circle cx="66" cy="66" r="4" fill="#fff"/><circle cx="102" cy="66" r="4" fill="#fff"/><ellipse cx="80" cy="86" rx="7" ry="6" fill="#C8540A"/><path d="M 56 106 Q 80 124 104 106" stroke="#1A1A1A" stroke-width="5" fill="none" stroke-linecap="round"/></svg>
+  <div id="cele-btns">
+    <button class="cele-btn cele-next" id="cele-next">つぎ ▶</button>
+    <button class="cele-btn cele-home" id="cele-home">⌂ おうち</button>
+  </div>
 </div>
 
 <script>
-const SHAPES = ['circle', 'square', 'star'];
-const placed  = new Set();
-let dragging  = null;
-let ghost     = null;
-let ghostOriginX = 0, ghostOriginY = 0;   // set once at dragstart
-let touchStartX  = 0, touchStartY  = 0;   // finger position at dragstart
-let lastDx       = 0, lastDy       = 0;   // current delta from start
+/* ════════════════════════════════════════════════════════════════
+   App state + audio
+   ════════════════════════════════════════════════════════════════ */
+const App = { sound: true, current: 'menu' };
 
-// ── SVG strings for filled targets ─────────────────────────────────────────
-const filledSVGs = {
-  circle: `<svg viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
-    <circle cx="60" cy="60" r="56" fill="#F4A828"/>
-    <circle cx="36" cy="70" r="14" fill="#FF5555" opacity="0.76"/>
-    <circle cx="84" cy="70" r="14" fill="#FF5555" opacity="0.76"/>
-    <ellipse cx="43" cy="51" rx="8" ry="9" fill="#1A1A1A"/>
-    <ellipse cx="77" cy="51" rx="8" ry="9" fill="#1A1A1A"/>
-    <circle cx="47" cy="48" r="3" fill="#fff"/>
-    <circle cx="81" cy="48" r="3" fill="#fff"/>
-    <ellipse cx="60" cy="66" rx="6" ry="5" fill="#C8540A"/>
-    <path d="M 42 81 Q 60 96 78 81" stroke="#1A1A1A" stroke-width="4" fill="none" stroke-linecap="round"/>
-  </svg>`,
-  square: `<svg viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
-    <rect x="6" y="10" width="108" height="100" rx="18" fill="#F5E6C8"/>
-    <rect x="6" y="10" width="108" height="38" rx="18" fill="#E8C870"/>
-    <ellipse cx="42" cy="62" rx="8" ry="9" fill="#1A1A1A"/>
-    <ellipse cx="78" cy="62" rx="8" ry="9" fill="#1A1A1A"/>
-    <circle cx="46" cy="59" r="3" fill="#fff"/>
-    <circle cx="82" cy="59" r="3" fill="#fff"/>
-    <circle cx="28" cy="77" r="12" fill="#FF9090" opacity="0.68"/>
-    <circle cx="92" cy="77" r="12" fill="#FF9090" opacity="0.68"/>
-    <ellipse cx="60" cy="73" rx="6" ry="5" fill="#C8986A"/>
-    <path d="M 42 88 Q 60 102 78 88" stroke="#1A1A1A" stroke-width="4" fill="none" stroke-linecap="round"/>
-  </svg>`,
-  star: `<svg viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
-    <polygon points="60,8 73,40 111,42 83,67 91,103 60,83 29,103 37,67 9,42 47,40"
-      fill="#6633AA" stroke="#330066" stroke-width="1.5"/>
-    <circle cx="60" cy="60" r="22" fill="#9966CC"/>
-    <polygon points="9,42 0,6 36,34" fill="#6633AA" stroke="#330066" stroke-width="1"/>
-    <polygon points="111,42 120,6 84,34" fill="#6633AA" stroke="#330066" stroke-width="1"/>
-    <circle cx="0"   cy="6"  r="5" fill="#FFD700"/>
-    <circle cx="120" cy="6"  r="5" fill="#FFD700"/>
-    <ellipse cx="50" cy="58" rx="8" ry="7" fill="#fff"/>
-    <ellipse cx="70" cy="58" rx="8" ry="7" fill="#fff"/>
-    <ellipse cx="50" cy="59" rx="5" ry="5.5" fill="#1A1A1A"/>
-    <ellipse cx="70" cy="59" rx="5" ry="5.5" fill="#1A1A1A"/>
-    <circle cx="52" cy="57" r="2" fill="#fff"/>
-    <circle cx="72" cy="57" r="2" fill="#fff"/>
-    <path d="M 38 50 Q 50 44 62 49" stroke="#1A1A1A" stroke-width="2.8" fill="none"/>
-    <path d="M 58 49 Q 70 44 82 50" stroke="#1A1A1A" stroke-width="2.8" fill="none"/>
-    <path d="M 44 75 Q 60 85 76 75" stroke="#1A1A1A" stroke-width="3" fill="none" stroke-linecap="round"/>
-    <polygon points="51,76 54,85 57,76" fill="#fff"/>
-    <polygon points="57,76 60,85 63,76" fill="#fff"/>
-  </svg>`
-};
-
-const emptySVGs = {
-  circle: `<svg viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
-    <circle cx="60" cy="60" r="52" fill="rgba(255,255,255,0.3)" stroke="rgba(255,255,255,0.7)" stroke-width="9"/>
-    <circle cx="60" cy="60" r="52" fill="none" stroke="#FF6B00" stroke-width="5" stroke-dasharray="11 7"/>
-  </svg>`,
-  square: `<svg viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
-    <rect x="9" y="9" width="102" height="102" rx="16" fill="rgba(255,255,255,0.3)" stroke="rgba(255,255,255,0.7)" stroke-width="9"/>
-    <rect x="9" y="9" width="102" height="102" rx="16" fill="none" stroke="#4466FF" stroke-width="5" stroke-dasharray="11 7"/>
-  </svg>`,
-  star: `<svg viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
-    <polygon points="60,8 73,40 111,42 83,67 91,103 60,83 29,103 37,67 9,42 47,40"
-      fill="rgba(255,255,255,0.3)" stroke="rgba(255,255,255,0.75)" stroke-width="9"/>
-    <polygon points="60,8 73,40 111,42 83,67 91,103 60,83 29,103 37,67 9,42 47,40"
-      fill="none" stroke="#9933CC" stroke-width="5" stroke-dasharray="11 7"/>
-  </svg>`
-};
-
-// ── Audio ────────────────────────────────────────────────────────────────────
-function playSound(type) {
-  try {
-    const ctx = new (window.AudioContext || window.webkitAudioContext)();
-    if (type === 'success') {
-      const o = ctx.createOscillator(), g = ctx.createGain();
-      o.connect(g); g.connect(ctx.destination);
-      o.frequency.setValueAtTime(523, ctx.currentTime);
-      o.frequency.setValueAtTime(659, ctx.currentTime + 0.13);
-      o.frequency.setValueAtTime(784, ctx.currentTime + 0.26);
-      g.gain.setValueAtTime(0.3, ctx.currentTime);
-      g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.55);
-      o.start(); o.stop(ctx.currentTime + 0.55);
-    } else if (type === 'win') {
-      [523,587,659,698,784,880].forEach((f,i) => {
+const SFX = {
+  ctx: null,
+  ac() { if (!this.ctx) this.ctx = new (window.AudioContext || window.webkitAudioContext)(); return this.ctx; },
+  tone(freqs, dur, vol, type='sine') {
+    if (!App.sound) return;
+    try {
+      const ctx = this.ac();
+      freqs.forEach((f, i) => {
         const o = ctx.createOscillator(), g = ctx.createGain();
-        o.connect(g); g.connect(ctx.destination);
-        o.frequency.value = f;
-        g.gain.setValueAtTime(0.28, ctx.currentTime + i*0.11);
-        g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + i*0.11 + 0.32);
-        o.start(ctx.currentTime + i*0.11);
-        o.stop(ctx.currentTime + i*0.11 + 0.35);
+        o.type = type; o.connect(g); g.connect(ctx.destination);
+        const t0 = ctx.currentTime + i * (dur * 0.55);
+        o.frequency.setValueAtTime(f, t0);
+        g.gain.setValueAtTime(vol, t0);
+        g.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
+        o.start(t0); o.stop(t0 + dur);
       });
-    } else if (type === 'wrong') {
-      const o = ctx.createOscillator(), g = ctx.createGain();
-      o.connect(g); g.connect(ctx.destination);
-      o.frequency.setValueAtTime(210, ctx.currentTime);
-      o.frequency.setValueAtTime(175, ctx.currentTime + 0.1);
-      g.gain.setValueAtTime(0.22, ctx.currentTime);
-      g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.28);
-      o.start(); o.stop(ctx.currentTime + 0.32);
-    }
-  } catch(e) {}
+    } catch(e) {}
+  },
+  good()  { this.tone([523, 659, 784], 0.45, 0.3); },
+  win()   { this.tone([523,587,659,698,784,880], 0.34, 0.28); },
+  wrong() { this.tone([210, 170], 0.22, 0.22, 'triangle'); },
+  pop()   { this.tone([700, 1000], 0.16, 0.3, 'sine'); },
+};
+
+function updateSoundIcons() {
+  document.querySelectorAll('.snd, #sound-menu').forEach(b => b.textContent = App.sound ? '🔊' : '🔈');
+}
+function toggleSound() { App.sound = !App.sound; updateSoundIcons(); }
+
+/* ════════════════════════════════════════════════════════════════
+   Character & shape SVG library  (inner markup, viewBox 0 0 100 100)
+   ════════════════════════════════════════════════════════════════ */
+const Faces = {
+  anpanman: `<circle cx="50" cy="50" r="46" fill="#F4A828"/>
+    <circle cx="28" cy="58" r="11" fill="#FF5555" opacity=".78"/><circle cx="72" cy="58" r="11" fill="#FF5555" opacity=".78"/>
+    <ellipse cx="36" cy="44" rx="6.5" ry="8" fill="#222"/><ellipse cx="64" cy="44" rx="6.5" ry="8" fill="#222"/>
+    <circle cx="38" cy="41" r="2.2" fill="#fff"/><circle cx="66" cy="41" r="2.2" fill="#fff"/>
+    <ellipse cx="50" cy="56" rx="4.5" ry="3.5" fill="#C8540A"/>
+    <path d="M35 65 Q50 78 65 65" stroke="#222" stroke-width="3" fill="none" stroke-linecap="round"/>`,
+  shokupanman: `<rect x="6" y="12" width="88" height="80" rx="18" fill="#F6E8CB"/>
+    <rect x="6" y="12" width="88" height="30" rx="18" fill="#E7C56A"/>
+    <ellipse cx="37" cy="52" rx="6.5" ry="8" fill="#222"/><ellipse cx="63" cy="52" rx="6.5" ry="8" fill="#222"/>
+    <circle cx="39" cy="49" r="2.2" fill="#fff"/><circle cx="65" cy="49" r="2.2" fill="#fff"/>
+    <circle cx="26" cy="64" r="9" fill="#FF9A9A" opacity=".7"/><circle cx="74" cy="64" r="9" fill="#FF9A9A" opacity=".7"/>
+    <ellipse cx="50" cy="61" rx="4" ry="3" fill="#C9986A"/>
+    <path d="M37 71 Q50 82 63 71" stroke="#222" stroke-width="3" fill="none" stroke-linecap="round"/>`,
+  currypanman: `<circle cx="50" cy="55" r="44" fill="#EE8A22"/>
+    <g fill="#7A3F18"><circle cx="18" cy="38" r="9"/><circle cx="34" cy="31" r="10"/><circle cx="50" cy="29" r="10"/><circle cx="66" cy="31" r="10"/><circle cx="82" cy="38" r="9"/></g>
+    <ellipse cx="37" cy="55" rx="6.5" ry="8" fill="#222"/><ellipse cx="63" cy="55" rx="6.5" ry="8" fill="#222"/>
+    <circle cx="39" cy="52" r="2.2" fill="#fff"/><circle cx="65" cy="52" r="2.2" fill="#fff"/>
+    <path d="M28 47 L44 52" stroke="#5A2E10" stroke-width="3" stroke-linecap="round"/><path d="M72 47 L56 52" stroke="#5A2E10" stroke-width="3" stroke-linecap="round"/>
+    <ellipse cx="50" cy="64" rx="4" ry="3" fill="#A85410"/>
+    <path d="M37 72 Q50 82 63 72" stroke="#222" stroke-width="3" fill="none" stroke-linecap="round"/>`,
+  baikinman: `<circle cx="50" cy="54" r="42" fill="#7B45C2"/>
+    <polygon points="22,34 6,8 40,30" fill="#7B45C2"/><polygon points="78,34 94,8 60,30" fill="#7B45C2"/>
+    <circle cx="6" cy="8" r="4.5" fill="#FFD400"/><circle cx="94" cy="8" r="4.5" fill="#FFD400"/>
+    <ellipse cx="38" cy="52" rx="8" ry="7" fill="#fff"/><ellipse cx="62" cy="52" rx="8" ry="7" fill="#fff"/>
+    <ellipse cx="38" cy="53" rx="5" ry="5.5" fill="#222"/><ellipse cx="62" cy="53" rx="5" ry="5.5" fill="#222"/>
+    <circle cx="40" cy="51" r="1.8" fill="#fff"/><circle cx="64" cy="51" r="1.8" fill="#fff"/>
+    <path d="M28 44 Q38 39 48 44" stroke="#222" stroke-width="2.5" fill="none"/><path d="M52 44 Q62 39 72 44" stroke="#222" stroke-width="2.5" fill="none"/>
+    <path d="M36 64 Q50 74 64 64" stroke="#222" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+    <polygon points="44,66 47,74 50,66" fill="#fff"/><polygon points="50,66 53,74 56,66" fill="#fff"/>`,
+  melonpanna: `<circle cx="22" cy="40" r="15" fill="#BDE08A"/><circle cx="78" cy="40" r="15" fill="#BDE08A"/>
+    <circle cx="50" cy="55" r="42" fill="#CDEB9D"/>
+    <ellipse cx="37" cy="54" rx="6.5" ry="8" fill="#222"/><ellipse cx="63" cy="54" rx="6.5" ry="8" fill="#222"/>
+    <circle cx="39" cy="51" r="2.2" fill="#fff"/><circle cx="65" cy="51" r="2.2" fill="#fff"/>
+    <circle cx="27" cy="65" r="9" fill="#FF9ABF" opacity=".75"/><circle cx="73" cy="65" r="9" fill="#FF9ABF" opacity=".75"/>
+    <ellipse cx="50" cy="62" rx="3.5" ry="2.8" fill="#7DA85A"/>
+    <path d="M40 70 Q50 79 60 70" stroke="#222" stroke-width="3" fill="none" stroke-linecap="round"/>`,
+  dokinchan: `<circle cx="50" cy="53" r="43" fill="#F4B6C2"/>
+    <path d="M50 12 Q60 2 64 14" stroke="#E083A0" stroke-width="5" fill="none" stroke-linecap="round"/>
+    <ellipse cx="37" cy="52" rx="7" ry="9" fill="#222"/><ellipse cx="63" cy="52" rx="7" ry="9" fill="#222"/>
+    <circle cx="39" cy="48" r="2.4" fill="#fff"/><circle cx="65" cy="48" r="2.4" fill="#fff"/>
+    <path d="M28 44 L34 41" stroke="#222" stroke-width="2" stroke-linecap="round"/><path d="M72 44 L66 41" stroke="#222" stroke-width="2" stroke-linecap="round"/>
+    <circle cx="26" cy="64" r="8" fill="#FF7A9E" opacity=".6"/><circle cx="74" cy="64" r="8" fill="#FF7A9E" opacity=".6"/>
+    <ellipse cx="50" cy="61" rx="3.5" ry="2.8" fill="#D06A86"/>
+    <path d="M42 70 Q50 77 58 70" stroke="#222" stroke-width="2.6" fill="none" stroke-linecap="round"/>`,
+};
+const FACE_KEYS = Object.keys(Faces);
+
+function faceSVG(key, vb=100) {
+  return `<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">${Faces[key]}</svg>`;
 }
 
-// ── Sparkle burst ────────────────────────────────────────────────────────────
-function spawnSparkles(x, y) {
+/* Geometric shapes for SHAPES mode (character drawn inside its shape). */
+const Shapes = {
+  circle: {
+    char: 'anpanman', stroke: '#FF6B00',
+    outline: (s) => `<circle cx="60" cy="60" r="52" fill="rgba(255,255,255,.3)" stroke="rgba(255,255,255,.7)" stroke-width="9"/>
+      <circle cx="60" cy="60" r="52" fill="none" stroke="${s}" stroke-width="5" stroke-dasharray="11 7"/>`,
+    piece: () => `<g>${Faces.anpanman}</g>`
+  },
+  square: {
+    char: 'shokupanman', stroke: '#4466FF',
+    outline: (s) => `<rect x="9" y="9" width="102" height="102" rx="16" fill="rgba(255,255,255,.3)" stroke="rgba(255,255,255,.7)" stroke-width="9"/>
+      <rect x="9" y="9" width="102" height="102" rx="16" fill="none" stroke="${s}" stroke-width="5" stroke-dasharray="11 7"/>`,
+    piece: () => `<g>${Faces.shokupanman}</g>`
+  },
+  star: {
+    char: 'baikinman', stroke: '#9933CC',
+    pts: '60,8 73,40 111,42 83,67 91,103 60,83 29,103 37,67 9,42 47,40',
+    outline: function(s){ return `<polygon points="${this.pts}" fill="rgba(255,255,255,.3)" stroke="rgba(255,255,255,.75)" stroke-width="9"/>
+      <polygon points="${this.pts}" fill="none" stroke="${s}" stroke-width="5" stroke-dasharray="11 7"/>`; },
+    piece: () => `<g>
+      <polygon points="55,11 67,37 98,39 76,61 81,89 55,73 29,89 34,61 12,39 43,37" fill="#6633AA" stroke="#330066" stroke-width="1.5"/>
+      <circle cx="55" cy="55" r="19" fill="#9966CC"/>
+      <polygon points="12,39 2,6 34,32" fill="#6633AA" stroke="#330066" stroke-width="1"/><polygon points="98,39 108,6 76,32" fill="#6633AA" stroke="#330066" stroke-width="1"/>
+      <circle cx="2" cy="6" r="4.5" fill="#FFD700"/><circle cx="108" cy="6" r="4.5" fill="#FFD700"/>
+      <ellipse cx="46" cy="53" rx="7" ry="6.5" fill="#fff"/><ellipse cx="64" cy="53" rx="7" ry="6.5" fill="#fff"/>
+      <ellipse cx="46" cy="54" rx="4.5" ry="5" fill="#1A1A1A"/><ellipse cx="64" cy="54" rx="4.5" ry="5" fill="#1A1A1A"/>
+      <circle cx="48" cy="52" r="1.8" fill="#fff"/><circle cx="66" cy="52" r="1.8" fill="#fff"/>
+      <path d="M36 46 Q46 41 56 45" stroke="#1A1A1A" stroke-width="2.5" fill="none"/><path d="M54 45 Q64 41 74 46" stroke="#1A1A1A" stroke-width="2.5" fill="none"/>
+      <path d="M38 65 Q55 75 72 65" stroke="#1A1A1A" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+      <polygon points="46,67 49,75 52,67" fill="#fff"/><polygon points="52,67 55,75 58,67" fill="#fff"/></g>`
+  },
+  triangle: {
+    char: 'currypanman', stroke: '#E0792A',
+    outline: (s) => `<polygon points="60,12 108,104 12,104" fill="rgba(255,255,255,.3)" stroke="rgba(255,255,255,.7)" stroke-width="9" stroke-linejoin="round"/>
+      <polygon points="60,12 108,104 12,104" fill="none" stroke="${s}" stroke-width="5" stroke-dasharray="11 7" stroke-linejoin="round"/>`,
+    piece: () => `<g><polygon points="50,8 96,92 4,92" fill="#EE8A22" stroke="#9A5418" stroke-width="2" stroke-linejoin="round"/>
+      <ellipse cx="40" cy="64" rx="6" ry="7.5" fill="#222"/><ellipse cx="60" cy="64" rx="6" ry="7.5" fill="#222"/>
+      <circle cx="42" cy="61" r="2" fill="#fff"/><circle cx="62" cy="61" r="2" fill="#fff"/>
+      <path d="M32 56 L44 60" stroke="#5A2E10" stroke-width="3" stroke-linecap="round"/><path d="M68 56 L56 60" stroke="#5A2E10" stroke-width="3" stroke-linecap="round"/>
+      <ellipse cx="50" cy="72" rx="3.5" ry="2.6" fill="#A85410"/>
+      <path d="M40 80 Q50 87 60 80" stroke="#222" stroke-width="2.6" fill="none" stroke-linecap="round"/></g>`
+  },
+  heart: {
+    char: 'dokinchan', stroke: '#FF4D88',
+    path: 'M60 104 C20 74 12 48 12 34 C12 18 26 10 40 14 C50 17 56 24 60 32 C64 24 70 17 80 14 C94 10 108 18 108 34 C108 48 100 74 60 104 Z',
+    outline: function(s){ return `<path d="${this.path}" fill="rgba(255,255,255,.3)" stroke="rgba(255,255,255,.7)" stroke-width="9" stroke-linejoin="round"/>
+      <path d="${this.path}" fill="none" stroke="${s}" stroke-width="5" stroke-dasharray="11 7" stroke-linejoin="round"/>`; },
+    piece: () => `<g><path d="M50 92 C16 66 9 44 9 31 C9 17 21 10 33 14 C42 17 47 23 50 30 C53 23 58 17 67 14 C79 10 91 17 91 31 C91 44 84 66 50 92 Z" fill="#F4B6C2" stroke="#D06A86" stroke-width="2"/>
+      <ellipse cx="38" cy="44" rx="6" ry="7.5" fill="#222"/><ellipse cx="62" cy="44" rx="6" ry="7.5" fill="#222"/>
+      <circle cx="40" cy="41" r="2" fill="#fff"/><circle cx="64" cy="41" r="2" fill="#fff"/>
+      <circle cx="28" cy="54" r="7" fill="#FF7A9E" opacity=".6"/><circle cx="72" cy="54" r="7" fill="#FF7A9E" opacity=".6"/>
+      <path d="M43 60 Q50 67 57 60" stroke="#222" stroke-width="2.6" fill="none" stroke-linecap="round"/></g>`
+  },
+};
+const SHAPE_KEYS = Object.keys(Shapes);
+
+/* ════════════════════════════════════════════════════════════════
+   Helpers
+   ════════════════════════════════════════════════════════════════ */
+function shuffle(a){ a=a.slice(); for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];} return a; }
+function pickN(arr,n){ return shuffle(arr).slice(0,n); }
+
+function sparkles(x, y) {
   const em = ['⭐','🌟','✨','🎉','💛','🌈','🎊'];
-  for (let i = 0; i < 7; i++) {
-    const s = document.createElement('div');
-    s.className = 'sparkle';
-    s.textContent = em[i % em.length];
-    s.style.left  = (x + (Math.random()-0.5)*100) + 'px';
-    s.style.top   = (y + (Math.random()-0.5)*80)  + 'px';
-    s.style.animationDelay = (i * 0.07) + 's';
-    document.body.appendChild(s);
-    setTimeout(() => s.remove(), 1500);
+  for (let i=0;i<7;i++){
+    const s=document.createElement('div'); s.className='sparkle'; s.textContent=em[i%em.length];
+    s.style.left=(x+(Math.random()-0.5)*100)+'px'; s.style.top=(y+(Math.random()-0.5)*80)+'px';
+    s.style.animationDelay=(i*0.07)+'s'; document.body.appendChild(s);
+    setTimeout(()=>s.remove(),1500);
   }
 }
 
-// ── Fill target on correct match ─────────────────────────────────────────────
-function fillTarget(shape, tx, ty) {
-  const target = document.getElementById('target-' + shape);
-  target.innerHTML = filledSVGs[shape];
-  target.classList.remove('filled');
-  target.offsetWidth; // reflow
-  target.classList.add('filled');
-  placed.add(shape);
-  spawnSparkles(tx, ty);
-  playSound('success');
-
-  if (placed.size === 3) {
-    setTimeout(() => {
-      playSound('win');
-      spawnSparkles(window.innerWidth*0.25, window.innerHeight*0.5);
-      spawnSparkles(window.innerWidth*0.75, window.innerHeight*0.5);
-      spawnSparkles(window.innerWidth*0.5,  window.innerHeight*0.35);
-      document.getElementById('celebration').classList.add('show');
-    }, 550);
+/* ════════════════════════════════════════════════════════════════
+   Generic drag engine (used by Shapes + Colors)
+   translate3d ghost — reliable on iOS
+   ════════════════════════════════════════════════════════════════ */
+const Drag = {
+  ghost:null, el:null, ox:0, oy:0, sx:0, sy:0, dx:0, dy:0, onDrop:null,
+  begin(e, el){
+    if (el.classList.contains('placed')) return;
+    const t = e.touches ? e.touches[0] : e;
+    const r = el.getBoundingClientRect();
+    this.ox=r.left; this.oy=r.top; this.sx=t.clientX; this.sy=t.clientY; this.dx=0; this.dy=0;
+    this.ghost=document.createElement('div'); this.ghost.className='piece-ghost';
+    this.ghost.style.width=r.width+'px'; this.ghost.style.height=r.height+'px';
+    this.ghost.style.left=r.left+'px'; this.ghost.style.top=r.top+'px';
+    this.ghost.style.transform='translate3d(0,0,0)';
+    this.ghost.innerHTML=el.innerHTML;
+    document.body.appendChild(this.ghost);
+    el.style.opacity='0.22'; this.el=el;
+  },
+  move(e){
+    if(!this.ghost) return; e.preventDefault();
+    const t=e.touches?e.touches[0]:e;
+    this.dx=t.clientX-this.sx; this.dy=t.clientY-this.sy;
+    this.ghost.style.transform=`translate3d(${this.dx}px,${this.dy}px,0)`;
+  },
+  end(){
+    if(!this.ghost||!this.el) return;
+    const w=parseFloat(this.ghost.style.width), h=parseFloat(this.ghost.style.height);
+    const cx=this.ox+w/2+this.dx, cy=this.oy+h/2+this.dy;
+    this.ghost.remove(); this.ghost=null;
+    const el=this.el; this.el=null;
+    if(this.onDrop) this.onDrop(el, cx, cy);
   }
+};
+document.addEventListener('touchmove', e=>Drag.move(e), {passive:false});
+document.addEventListener('touchend',  ()=>Drag.end(), {passive:false});
+document.addEventListener('mousemove', e=>Drag.move(e));
+document.addEventListener('mouseup',   ()=>Drag.end());
+
+function makeDraggable(el){
+  el.addEventListener('touchstart', e=>{ e.preventDefault(); Drag.begin(e, el); }, {passive:false});
+  el.addEventListener('mousedown',  e=>Drag.begin(e, el));
 }
+function centerOf(el){ const r=el.getBoundingClientRect(); return {x:r.left+r.width/2, y:r.top+r.height/2}; }
 
-// ── Drag: START ──────────────────────────────────────────────────────────────
-function startDrag(e, el) {
-  if (placed.has(el.dataset.shape)) return;
-
-  const t = e.touches ? e.touches[0] : e;
-  const r = el.getBoundingClientRect();
-
-  // Record initial positions — these are NEVER updated during drag
-  ghostOriginX = r.left;
-  ghostOriginY = r.top;
-  touchStartX  = t.clientX;
-  touchStartY  = t.clientY;
-  lastDx = 0;
-  lastDy = 0;
-
-  // Build ghost (clone, fixed position set ONCE, movement via transform only)
-  ghost = document.createElement('div');
-  ghost.className = 'piece-ghost';
-  ghost.style.width   = r.width  + 'px';
-  ghost.style.height  = r.height + 'px';
-  ghost.style.left    = r.left   + 'px';
-  ghost.style.top     = r.top    + 'px';
-  ghost.style.transform = 'translate3d(0,0,0)';
-  ghost.innerHTML = el.innerHTML;   // copy SVG content
-  document.body.appendChild(ghost);
-
-  el.style.opacity = '0.22';
-  dragging = el;
+/* ════════════════════════════════════════════════════════════════
+   Celebration
+   ════════════════════════════════════════════════════════════════ */
+let onNextRound = null;
+function celebrate(nextFn){
+  onNextRound = nextFn;
+  SFX.win();
+  sparkles(innerWidth*0.25, innerHeight*0.5);
+  sparkles(innerWidth*0.75, innerHeight*0.5);
+  sparkles(innerWidth*0.5, innerHeight*0.35);
+  document.getElementById('celebration').classList.add('show');
 }
-
-// ── Drag: MOVE ───────────────────────────────────────────────────────────────
-function moveDrag(e) {
-  if (!ghost) return;
-  e.preventDefault();
-  const t = e.touches ? e.touches[0] : e;
-  lastDx = t.clientX - touchStartX;
-  lastDy = t.clientY - touchStartY;
-  ghost.style.transform = `translate3d(${lastDx}px,${lastDy}px,0)`;
-}
-
-// ── Drag: END ────────────────────────────────────────────────────────────────
-function endDrag(e) {
-  if (!ghost || !dragging) return;
-
-  // Ghost center from stored origin + accumulated delta (no getBoundingClientRect!)
-  const gw = parseFloat(ghost.style.width);
-  const gh = parseFloat(ghost.style.height);
-  const cx = ghostOriginX + gw/2 + lastDx;
-  const cy = ghostOriginY + gh/2 + lastDy;
-
-  ghost.remove();
-  ghost = null;
-
-  const shape  = dragging.dataset.shape;
-  const target = document.getElementById('target-' + shape);
-  const tr     = target.getBoundingClientRect();
-  const tx     = tr.left + tr.width  / 2;
-  const ty     = tr.top  + tr.height / 2;
-
-  if (Math.hypot(cx - tx, cy - ty) < 90) {
-    // ✓ Correct match
-    dragging.classList.add('placed');
-    fillTarget(shape, tx, ty);
-  } else {
-    // Check wrong targets
-    let hitWrong = false;
-    for (const s of SHAPES) {
-      if (s === shape) continue;
-      const ot = document.getElementById('target-' + s);
-      const or = ot.getBoundingClientRect();
-      const ox = or.left + or.width  / 2;
-      const oy = or.top  + or.height / 2;
-      if (Math.hypot(cx - ox, cy - oy) < 90) {
-        playSound('wrong');
-        ot.style.animation = 'none';
-        ot.offsetWidth; // reflow
-        ot.style.animation = 'shake 0.32s ease';
-        hitWrong = true;
-        break;
-      }
-    }
-    dragging.style.opacity = '1';
-  }
-  dragging = null;
-}
-
-// ── Attach listeners ─────────────────────────────────────────────────────────
-document.querySelectorAll('.piece').forEach(p => {
-  p.addEventListener('touchstart', e => { e.preventDefault(); startDrag(e, p); }, { passive: false });
-  p.addEventListener('mousedown',  e => startDrag(e, p));
-});
-
-document.addEventListener('touchmove', moveDrag, { passive: false });
-document.addEventListener('touchend',  endDrag,  { passive: false });
-document.addEventListener('mousemove', moveDrag);
-document.addEventListener('mouseup',   endDrag);
-
-// ── Play again ───────────────────────────────────────────────────────────────
-document.getElementById('play-again').addEventListener('click', () => {
-  placed.clear();
+document.getElementById('cele-next').onclick = ()=>{
   document.getElementById('celebration').classList.remove('show');
-  SHAPES.forEach(s => {
-    const target = document.getElementById('target-' + s);
-    target.innerHTML = emptySVGs[s];
-    target.classList.remove('filled');
-    target.style.animation = '';
+  if(onNextRound) onNextRound();
+};
+document.getElementById('cele-home').onclick = ()=>{
+  document.getElementById('celebration').classList.remove('show');
+  Router.go('menu');
+};
 
-    const piece = document.getElementById('piece-' + s);
-    piece.classList.remove('placed');
-    piece.style.opacity = '1';
-  });
+/* ════════════════════════════════════════════════════════════════
+   MODE: Shapes
+   ════════════════════════════════════════════════════════════════ */
+const ModeShapes = {
+  placed: new Set(),
+  start(){
+    this.placed = new Set();
+    const keys = shuffle(pickN(SHAPE_KEYS, 3));      // random 3 shapes, random order
+    const slots = document.getElementById('shapes-slots');
+    const pieces = document.getElementById('shapes-pieces');
+    slots.innerHTML=''; pieces.innerHTML='';
+
+    keys.forEach(k=>{
+      const sp = Shapes[k];
+      const slot=document.createElement('div');
+      slot.className='slot idle'; slot.id='sslot-'+k; slot.dataset.shape=k;
+      slot.innerHTML=`<svg viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">${sp.outline(sp.stroke)}</svg>`;
+      slots.appendChild(slot);
+    });
+    shuffle(keys).forEach(k=>{                         // pieces in different order
+      const sp = Shapes[k];
+      const pc=document.createElement('div');
+      pc.className='piece'; pc.id='spiece-'+k; pc.dataset.shape=k;
+      pc.innerHTML=`<svg viewBox="0 0 110 110" xmlns="http://www.w3.org/2000/svg">${sp.piece()}</svg>`;
+      pieces.appendChild(pc); makeDraggable(pc);
+    });
+
+    Drag.onDrop = (el, cx, cy)=>this.drop(el, cx, cy);
+  },
+  drop(el, cx, cy){
+    const shape=el.dataset.shape;
+    const slot=document.getElementById('sslot-'+shape);
+    const c=centerOf(slot);
+    if(Math.hypot(cx-c.x, cy-c.y) < 92){
+      el.classList.add('placed');
+      const sp=Shapes[shape];
+      slot.classList.remove('idle');
+      slot.innerHTML=`<svg viewBox="0 0 110 110" xmlns="http://www.w3.org/2000/svg">${sp.piece()}</svg>`;
+      slot.classList.remove('filled'); slot.offsetWidth; slot.classList.add('filled');
+      this.placed.add(shape); sparkles(c.x, c.y); SFX.good();
+      if(this.placed.size===3) setTimeout(()=>celebrate(()=>this.start()), 550);
+    } else {
+      // wrong slot shake
+      ['sslot-'].forEach(()=>{});
+      document.querySelectorAll('#shapes-slots .slot').forEach(s=>{
+        if(s.dataset.shape===shape) return;
+        const oc=centerOf(s);
+        if(Math.hypot(cx-oc.x, cy-oc.y)<92){ SFX.wrong(); s.style.animation='none'; s.offsetWidth; s.style.animation='shake 0.32s ease'; }
+      });
+      el.style.opacity='1';
+    }
+  },
+  stop(){ Drag.onDrop=null; }
+};
+
+/* ════════════════════════════════════════════════════════════════
+   MODE: Colors
+   ════════════════════════════════════════════════════════════════ */
+const COLORS = {
+  red:    { fill:'#FF5A5A', dark:'#C83A3A' },
+  yellow: { fill:'#FFC83D', dark:'#D9A21F' },
+  blue:   { fill:'#4D9BFF', dark:'#2E6FBF' },
+  green:  { fill:'#5FC96A', dark:'#3E9E48' },
+  purple: { fill:'#C26BD8', dark:'#8E47A0' },
+  orange: { fill:'#FF8A3D', dark:'#C85E1A' },
+};
+const COLOR_KEYS = Object.keys(COLORS);
+
+function bucketSVG(c){
+  return `<svg viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
+    <ellipse cx="60" cy="108" rx="34" ry="7" fill="rgba(0,0,0,.12)"/>
+    <path d="M24 40 L96 40 L88 100 Q88 108 80 108 L40 108 Q32 108 32 100 Z" fill="${c.fill}"/>
+    <ellipse cx="60" cy="40" rx="36" ry="9" fill="${c.dark}"/>
+    <ellipse cx="60" cy="40" rx="29" ry="6" fill="rgba(255,255,255,.25)"/>
+  </svg>`;
+}
+function ballSVG(c){
+  return `<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+    <circle cx="50" cy="50" r="44" fill="${c.fill}"/>
+    <ellipse cx="38" cy="34" rx="13" ry="9" fill="rgba(255,255,255,.35)"/>
+    <ellipse cx="40" cy="50" rx="5" ry="6" fill="#222"/><ellipse cx="60" cy="50" rx="5" ry="6" fill="#222"/>
+    <circle cx="42" cy="48" r="1.6" fill="#fff"/><circle cx="62" cy="48" r="1.6" fill="#fff"/>
+    <path d="M40 64 Q50 72 60 64" stroke="#222" stroke-width="3" fill="none" stroke-linecap="round"/>
+  </svg>`;
+}
+
+const ModeColors = {
+  placed:new Set(),
+  start(){
+    this.placed=new Set();
+    const keys=shuffle(pickN(COLOR_KEYS,3));
+    const slots=document.getElementById('colors-slots');
+    const pieces=document.getElementById('colors-pieces');
+    slots.innerHTML=''; pieces.innerHTML='';
+    keys.forEach(k=>{
+      const slot=document.createElement('div'); slot.className='slot idle'; slot.id='cslot-'+k; slot.dataset.color=k;
+      slot.innerHTML=bucketSVG(COLORS[k]); slots.appendChild(slot);
+    });
+    shuffle(keys).forEach(k=>{
+      const pc=document.createElement('div'); pc.className='piece'; pc.id='cpiece-'+k; pc.dataset.color=k;
+      pc.innerHTML=ballSVG(COLORS[k]); pieces.appendChild(pc); makeDraggable(pc);
+    });
+    Drag.onDrop=(el,cx,cy)=>this.drop(el,cx,cy);
+  },
+  drop(el,cx,cy){
+    const color=el.dataset.color;
+    const slot=document.getElementById('cslot-'+color);
+    const c=centerOf(slot);
+    if(Math.hypot(cx-c.x,cy-c.y)<92){
+      el.classList.add('placed');
+      slot.classList.remove('idle','filled'); slot.offsetWidth; slot.classList.add('filled');
+      this.placed.add(color); sparkles(c.x,c.y); SFX.good();
+      if(this.placed.size===3) setTimeout(()=>celebrate(()=>this.start()),550);
+    } else {
+      document.querySelectorAll('#colors-slots .slot').forEach(s=>{
+        if(s.dataset.color===color) return;
+        const oc=centerOf(s);
+        if(Math.hypot(cx-oc.x,cy-oc.y)<92){ SFX.wrong(); s.style.animation='none'; s.offsetWidth; s.style.animation='shake 0.32s ease'; }
+      });
+      el.style.opacity='1';
+    }
+  },
+  stop(){ Drag.onDrop=null; }
+};
+
+/* ════════════════════════════════════════════════════════════════
+   MODE: Match (tap the same one)
+   ════════════════════════════════════════════════════════════════ */
+const ModeMatch = {
+  start(){
+    const opts=pickN(FACE_KEYS,3);
+    const answer=opts[Math.floor(Math.random()*opts.length)];
+    const tgt=document.getElementById('match-target');
+    tgt.innerHTML=faceSVG(answer);
+    tgt.classList.remove('filled'); tgt.offsetWidth; tgt.classList.add('filled');
+    const panel=document.getElementById('match-opts'); panel.innerHTML='';
+    shuffle(opts).forEach(k=>{
+      const b=document.createElement('button'); b.className='opt'; b.dataset.key=k;
+      b.innerHTML=faceSVG(k);
+      b.onclick=()=>{
+        if(k===answer){ const c=centerOf(b); sparkles(c.x,c.y); SFX.good(); setTimeout(()=>celebrate(()=>this.start()),350); }
+        else { SFX.wrong(); b.classList.remove('wrong'); b.offsetWidth; b.classList.add('wrong'); }
+      };
+      panel.appendChild(b);
+    });
+  },
+  stop(){}
+};
+
+/* ════════════════════════════════════════════════════════════════
+   MODE: Pop (tap floating bubbles)
+   ════════════════════════════════════════════════════════════════ */
+const ModePop = {
+  timer:null, score:0, running:false,
+  start(){
+    this.score=0; this.running=true;
+    document.getElementById('pop-score').textContent='タッチ: 0';
+    const field=document.getElementById('pop-field'); field.innerHTML='';
+    this.spawn(); this.spawn();
+    this.timer=setInterval(()=>this.spawn(), 900);
+  },
+  spawn(){
+    if(!this.running) return;
+    const field=document.getElementById('pop-field');
+    if(field.childElementCount>9) return;
+    const key=FACE_KEYS[Math.floor(Math.random()*FACE_KEYS.length)];
+    const size=70+Math.random()*42;
+    const b=document.createElement('div'); b.className='bubble';
+    b.style.width=size+'px'; b.style.height=size+'px';
+    b.style.left=(Math.random()*(innerWidth-size-20)+10)+'px';
+    const dur=5.5+Math.random()*3;
+    b.innerHTML=`<div class="ring"></div>${faceSVG(key)}`;
+    field.appendChild(b);
+    // rise animation via WAAPI (reliable, easy to read finish)
+    const anim=b.animate(
+      [{transform:`translateY(0) rotate(${(Math.random()-0.5)*20}deg)`},
+       {transform:`translateY(-${innerHeight+220}px) rotate(${(Math.random()-0.5)*40}deg)`}],
+      {duration:dur*1000, easing:'linear'}
+    );
+    anim.onfinish=()=>b.remove();
+    const pop=(e)=>{ e.preventDefault();
+      const r=b.getBoundingClientRect(); sparkles(r.left+r.width/2, r.top+r.height/2);
+      SFX.pop(); this.score++; document.getElementById('pop-score').textContent='タッチ: '+this.score;
+      anim.cancel(); b.remove();
+    };
+    b.addEventListener('touchstart', pop, {passive:false});
+    b.addEventListener('mousedown', pop);
+  },
+  stop(){ this.running=false; if(this.timer){ clearInterval(this.timer); this.timer=null; }
+    document.getElementById('pop-field').innerHTML=''; }
+};
+
+/* ════════════════════════════════════════════════════════════════
+   Router
+   ════════════════════════════════════════════════════════════════ */
+const MODES = { shapes:ModeShapes, colors:ModeColors, match:ModeMatch, pop:ModePop };
+const Router = {
+  go(name){
+    // stop current mode
+    if(MODES[App.current]) MODES[App.current].stop && MODES[App.current].stop();
+    document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+    document.getElementById('screen-'+name).classList.add('active');
+    App.current=name;
+    if(MODES[name]) MODES[name].start();
+    updateSoundIcons();
+  }
+};
+
+document.querySelectorAll('[data-go]').forEach(b=>{
+  b.addEventListener('click', ()=>{ SFX.ac(); Router.go(b.dataset.go); });
 });
+document.querySelectorAll('.snd, #sound-menu').forEach(b=> b.addEventListener('click', e=>{ e.stopPropagation(); toggleSound(); }));
+updateSoundIcons();
+
+/* ── Service worker for offline ── */
+if('serviceWorker' in navigator){
+  window.addEventListener('load', ()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));
+}
 </script>
 </body>
 </html>
