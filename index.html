@@ -814,7 +814,7 @@ const Router = {
 };
 
 document.querySelectorAll('[data-go]').forEach(b=>{
-  b.addEventListener('click', ()=>{ SFX.ac(); Router.go(b.dataset.go); });
+  b.addEventListener('click', ()=>{ SFX.unlock(); Router.go(b.dataset.go); });
 });
 document.querySelectorAll('.snd, #sound-menu').forEach(b=> b.addEventListener('click', e=>{ e.stopPropagation(); toggleSound(); }));
 updateSoundIcons();
