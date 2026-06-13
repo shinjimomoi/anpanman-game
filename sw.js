@@ -1,5 +1,5 @@
 /* Simple offline cache for the Anpanman game */
-const CACHE = 'anpanman-asobi-v1';
+const CACHE = 'anpanman-asobi-v2';
 const ASSETS = [
   './',
   './index.html',

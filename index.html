@@ -342,24 +342,49 @@ function showBadge(mode) {
   if (b) b.textContent = 'レベル ' + Levels.get(mode);
 }
 
+// Build a short silent WAV as a data URI (used to flip iOS into "playback"
+// audio session so Web Audio is heard even with the ringer/mute switch ON).
+function silentWavURI() {
+  const sr = 8000, n = Math.floor(sr * 0.4);
+  const buf = new ArrayBuffer(44 + n * 2), v = new DataView(buf);
+  const ws = (o, s) => { for (let i = 0; i < s.length; i++) v.setUint8(o + i, s.charCodeAt(i)); };
+  ws(0,'RIFF'); v.setUint32(4, 36 + n*2, true); ws(8,'WAVE'); ws(12,'fmt ');
+  v.setUint32(16,16,true); v.setUint16(20,1,true); v.setUint16(22,1,true);
+  v.setUint32(24,sr,true); v.setUint32(28,sr*2,true); v.setUint16(32,2,true); v.setUint16(34,16,true);
+  ws(36,'data'); v.setUint32(40, n*2, true);
+  let bin = ''; const b = new Uint8Array(buf);
+  for (let i = 0; i < b.length; i++) bin += String.fromCharCode(b[i]);
+  return 'data:audio/wav;base64,' + btoa(bin);
+}
+
 const SFX = {
   ctx: null,
+  silentEl: null,
   // Create the single shared AudioContext (lazily, inside a user gesture)
   init() {
     if (this.ctx) return this.ctx;
     try { this.ctx = new (window.AudioContext || window.webkitAudioContext)(); } catch(e) {}
     return this.ctx;
   },
-  // iOS unlock: resume the context and play one silent buffer on a real touch
+  // iOS unlock: resume the context, play one silent buffer, and loop a silent
+  // <audio> element so sound plays even when the phone's mute switch is on.
   unlock() {
     this.init();
-    if (!this.ctx) return;
-    if (this.ctx.state === 'suspended') this.ctx.resume();
-    try {
-      const b = this.ctx.createBuffer(1, 1, 22050);
-      const s = this.ctx.createBufferSource();
-      s.buffer = b; s.connect(this.ctx.destination); s.start(0);
-    } catch(e) {}
+    if (this.ctx) {
+      if (this.ctx.state === 'suspended') this.ctx.resume();
+      try {
+        const b = this.ctx.createBuffer(1, 1, 22050);
+        const s = this.ctx.createBufferSource();
+        s.buffer = b; s.connect(this.ctx.destination); s.start(0);
+      } catch(e) {}
+    }
+    if (!this.silentEl) {
+      const a = document.createElement('audio');
+      a.setAttribute('playsinline', ''); a.loop = true; a.preload = 'auto';
+      a.src = silentWavURI();
+      this.silentEl = a;
+    }
+    this.silentEl.play().catch(() => {});
   },
   tone(freqs, dur, vol, type='sine') {
     if (!App.sound) return;
